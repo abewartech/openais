@@ -1,0 +1,64 @@
+version: "3.7"
+#===============================
+# Compose extension fields
+#===============================
+x-logging:
+  &default-logging
+      driver: json-file
+      options:
+        max-size: 10m
+
+#===============================
+services: 
+#===============================
+  <service1>:
+  # This is a template for a service that has an outside 
+  # facing port. It will have port 8080, for example, routed
+  # to https://service1.traefikhost.com
+    image: <image>/<image>:${SERVICE1_DOCKER_TAG}
+    container_name: <service name>
+    command: <run time commands>
+    restart: unless-stopped
+    networks:
+      - traefik-public
+    logging: *default-logging
+    volumes:
+      volume1:/where/to/mnt/
+    labels:
+    # Labels applied to container on deployment. Typically used
+    # for routing with Traefik. 
+      - traefik.enable=true"
+      - traefik.docker.network=traefik-public
+      - traefik.http.routers.keycloak.rule=Host(`service1.${TRAEFIK_HOST}`)
+      - traefik.http.routers.keycloak.service=<service1>
+      - traefik.http.routers.keycloak.entrypoints=https
+      - traefik.http.services.keycloak.loadbalancer.server.port=8080
+      - traefik.http.routers.keycloak.tls=true
+      - traefik.http.routers.keycloak.tls.certresolver=le
+  <service2>:
+  # This is a template for a service that is not made available on the  
+  # Traefik network.
+    image: <image>/<image>:${SERVICE2_DOCKER_TAG}
+    container_name: <service name>
+    command:
+    restart: unless-stopped
+    ports:
+      - ${SERVICE2_PORT}:<container_port>
+    logging: *default-logging
+    volumes:
+      volume2:/where/to/mnt/
+     
+#===============================
+volumes:
+#===============================
+  volume1:
+  volume2:
+
+#===============================
+networks:
+#===============================
+  # Traefik Public network is for Reverse Proxy Network
+  traefik-public:
+    external: true
+
+
