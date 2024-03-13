@@ -1,0 +1,167 @@
+version: "3.7"
+#===============================
+# Compose extension fields
+#===============================
+x-logging:
+  &default-logging
+      driver: json-file
+      options:
+        max-size: 10m
+
+#===============================
+services: 
+#===============================
+  # file_reader:
+  # # Reads all AIS files stored in the mounted partition and places them onto the 
+  # # AIS pipeline (or does a direct insertion into the DB if easier)
+  #   image: <image>/<image>:${FILEREADER_TAG}
+  #   container_name: file_reader
+  #   command: <run time commands>
+  #   restart: unless-stopped
+  #   env_file:
+  #     - .env
+  #   depends_on:
+  #     - rabbit
+  #   networks:
+  #     - back_end
+  #   logging: *default-logging
+  #   volumes:
+  #     volume1:/where/to/mnt/ 
+
+  ais_i_mov:
+  # Connects to raw AIS message server and streams and parses
+  # raw AIS messages onto the pipeline.
+    image: registry.gitlab.com/openais/processing/ais-i-mov:${AISIMOV_TAG}
+    container_name: ais_i_mov
+    command: python /usr/local/ais_i_mov/main.py -ll 'DEBUG'
+    env_file:
+      - .env
+    restart: unless-stopped
+    depends_on:
+      - rabbitmq
+    networks:
+      - back_end 
+    logging: *default-logging 
+    volumes:
+      - ./volumes/ais_logs/:${LOG_DIR}
+
+  rabbitmq:
+  # RabbitMQ message broker. 
+    image: rabbitmq:${RABBIT_TAG}
+    container_name: rabbitmq 
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 30s
+      retries: 3
+    restart: unless-stopped
+    environment: 
+        RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+        RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    networks:
+      - back_end
+    ports:
+      - ${RABBIT_MANAGE_PORT}:15672
+    logging: *default-logging
+
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 20000
+        hard: 40000  
+    volumes:
+      - rabbit_data_store:/var/lib/rabbitmq
+      - rabbit_etc_store:/etc/rabbitmq
+
+  # ais_filter:
+  # # Drops AIS messages that are too close in time/space to 
+  # # previous messages from same ship. 
+  #   image: <image>/<image>:${SERVICE2_DOCKER_TAG}
+  #   container_name: <service name>
+  #   command:
+  #   restart: unless-stopped
+  #   networks:
+  #     - back_end
+  #   ports:
+  #     - ${SERVICE2_PORT}:<container_port>
+  #   logging: *default-logging
+  #   volumes:
+  #     volume2:/where/to/mnt/
+  
+  ais_decoder:
+  # Decodes the raw AIS messages 
+    image: registry.gitlab.com/openais/processing/ais_decoder:${DECODER_TAG}
+    container_name: ais_decoder
+    command: python /usr/local/ais_decoder/main.py -ll 'INFO'
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - rabbit
+    networks:
+      - back_end 
+    logging: *default-logging 
+     
+  db_inserter:
+  # Does bulk inserts into the DB from AIS pipeline
+    image: registry.gitlab.com/openais/processing/db-sink:${INSERTER_TAG}
+    container_name: db_inserter
+    command: python /usr/local/db-sink/main.py -ll 'INFO'
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - rabbit
+    networks:
+      - back_end
+    logging: *default-logging
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+
+  database:
+  # AIS datastore
+    image: registry.gitlab.com/openais/processing/integrated-database:${DB_TAG}
+    container_name: database
+    user: ${POSTGRES_UID}:${POSTGRES_GID}
+    shm_size: 4g
+    command: postgres -c shared_preload_libraries=timescaledb 
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - back_end
+    ports:
+      - ${DB_EXT_PORT}:5432
+    logging: *default-logging
+    volumes:
+      - db_store:/var/lib/postgresql/data 
+
+  api:
+  # Geospatial API for accessing data products from DB 
+    image: pramsey/pg_featureserv:${API_TAG}
+    container_name: api 
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database/${POSTGRES_DB}
+    networks:
+      - back_end
+      - front_end
+    ports:
+      - ${API_EXT_PORT}:9000
+    logging: *default-logging 
+
+#===============================
+volumes:
+#===============================
+  rabbit_data_store:
+  rabbit_etc_store:
+  db_store:
+  file_store:
+
+#===============================
+networks:
+#===============================
+  # Network for front end access/management
+  front_end:
+  # Network for data pipeline
+  back_end:
