@@ -33,7 +33,7 @@ services:
   # raw AIS messages onto the pipeline.
     image: registry.gitlab.com/openais/processing/ais-i-mov:${AISIMOV_TAG}
     container_name: ais_i_mov
-    command: python /usr/local/ais_i_mov/main.py -ll 'DEBUG'
+    command: python /usr/local/ais_i_mov/main.py -ll 'INFO'
     env_file:
       - .env
     restart: unless-stopped
@@ -97,7 +97,7 @@ services:
     env_file:
       - .env
     depends_on:
-      - rabbit
+      - rabbitmq
     networks:
       - back_end 
     logging: *default-logging 
@@ -111,7 +111,8 @@ services:
     env_file:
       - .env
     depends_on:
-      - rabbit
+      - rabbitmq
+      - database
     networks:
       - back_end
     logging: *default-logging
@@ -119,44 +120,74 @@ services:
       - /etc/localtime:/etc/localtime:ro
 
   database:
-  # AIS datastore
-    image: registry.gitlab.com/openais/processing/integrated-database:${DB_TAG}
+  # High availablity version of PG with
+  # Timescaledb and PostGIS extensions installed.
+  # https://github.com/timescale/timescaledb-docker-ha
+    image: registry.gitlab.com/openais/processing/integrated-database:${DATABASE_TAG}
     container_name: database
-    user: ${POSTGRES_UID}:${POSTGRES_GID}
+    user: ${UID}:${GID}
     shm_size: 4g
-    command: postgres -c shared_preload_libraries=timescaledb 
-    restart: unless-stopped
-    env_file:
-      - .env
+    command: postgres -c shared_preload_libraries=timescaledb
+    # restart: unless-stopped
     networks:
       - back_end
     ports:
       - ${DB_EXT_PORT}:5432
     logging: *default-logging
-    volumes:
-      - db_store:/var/lib/postgresql/data 
-
-  api:
-  # Geospatial API for accessing data products from DB 
-    image: pramsey/pg_featureserv:${API_TAG}
-    container_name: api 
-    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - '[ -f /home/postgres/pgdata/data/ready ]'
+        - pg_isready --username=${POSTGRES_USER} --dbname=${POSTGRES_DB}
+      start_period: 10m # needs a long start period when downloading shapes during initialization
+      interval: 1m
+      timeout: 5s
+      retries: 5
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database/${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_UID=${UID}
+      - POSTGRES_GID=${GID}
+      - FETCH_GEOM=${FETCH_GEOM}
+    volumes:
+    # Volume commented out to test building of DB. 
+    # Uncomment when requiring persistance 
+      # - db_volume:/home/postgres/pgdata/data
+      - file_store:/tmp/shapes:Z
+
+  featserv: 
+    image: pramsey/pg_featureserv:${PGFEATSERV_TAG}
+    container_name: featserv
+    restart: unless-stopped
+    # command: "--config /app/config.toml"
+    depends_on:
+      database:
+        condition: service_healthy
     networks:
       - back_end
-      - front_end
     ports:
-      - ${API_EXT_PORT}:9000
-    logging: *default-logging 
+      - ${API_PORT}:9000
+    logging: *default-logging
+    environment:
+      # - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database/${DB_NAME}
+      - DATABASE_URL=postgresql://${API_USER}:${API_PW}@database/${DB_NAME}
+      - PGFS_METADATA_TITLE=OpenAIS
+      - PGFS_METADATA_DESCRIPTION="OpenAIS Feature Server"
+      - PGFS_WEBSITE_BASEMAPURL=https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png
+      - PGFS_PAGING_LIMITDEFAULT=1000
+      - PGFS_PAGING_LIMITMAX=10000
+      - PGFS_SERVER_CORSORIGINS="*"
+    # volumes:
+      # - ./config/feat_serv_config.toml:/app/config.toml:ro
 
 #===============================
 volumes:
 #===============================
   rabbit_data_store:
   rabbit_etc_store:
-  db_store:
-  file_store:
+  db_store: 
+  file_store: 
 
 #===============================
 networks:
