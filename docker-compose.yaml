@@ -155,7 +155,7 @@ services:
     # Volume commented out to test building of DB. 
     # Uncomment when requiring persistance 
       # - ${DB_VOLUME_PATH}:/home/postgres/pgdata/data
-      - ./volumes/geom_files/:/tmp/shapes:Z
+      - db_geom_store:/tmp/shapes:Z
       - db_data_store:/home/postgres/pgdata/data 
 
   featserv: 
@@ -188,7 +188,8 @@ volumes:
 #===============================
   rabbit_etc_store:
   rabbit_data_store:
-  db_data_store:   
+  db_data_store:
+  db_geom_store:   
 
 #===============================
 networks:
