@@ -54,7 +54,8 @@ services:
       interval: 30s
       timeout: 30s
       retries: 3
-    restart: unless-stopped
+    # restart: unless-stopped
+    restart: always
     environment: 
         RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
         RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
@@ -128,7 +129,7 @@ services:
     user: ${UID}:${GID}
     shm_size: 4g
     command: postgres -c shared_preload_libraries=timescaledb
-    # restart: unless-stopped
+    restart: unless-stopped
     networks:
       - back_end
     ports:
@@ -153,8 +154,8 @@ services:
     volumes:
     # Volume commented out to test building of DB. 
     # Uncomment when requiring persistance 
-      # - db_volume:/home/postgres/pgdata/data
-      - file_store:/tmp/shapes:Z
+      - ${DB_VOLUME_PATH}:/home/postgres/pgdata/data
+      - ${GEOM_VOLUME_PATH}:/tmp/shapes:Z
 
   featserv: 
     image: pramsey/pg_featureserv:${PGFEATSERV_TAG}
@@ -184,10 +185,8 @@ services:
 #===============================
 volumes:
 #===============================
-  rabbit_data_store:
   rabbit_etc_store:
-  db_store: 
-  file_store: 
+  rabbit_data_store:  
 
 #===============================
 networks:
