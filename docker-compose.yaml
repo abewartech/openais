@@ -155,7 +155,7 @@ services:
     # Volume commented out to test building of DB. 
     # Uncomment when requiring persistance 
       # - ${DB_VOLUME_PATH}:/home/postgres/pgdata/data
-      - ${GEOM_VOLUME_PATH}:/tmp/shapes:Z
+      - ./volumes/geom_files/:/tmp/shapes:Z
       - db_data_store:/home/postgres/pgdata/data 
 
   featserv: 
