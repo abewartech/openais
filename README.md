@@ -69,3 +69,54 @@ AIS data is published as "Collections" and several are available. These are [def
 # ENV Config
 
 This is a description of the environment variables used to deploy the container stack. These can be left at their default or changed to reflect your specific instance.  
+
+
+# Updating Services
+You may have noticed that there are docker tags assigned in the environment variables. These can be changed to use a specific version of one of the services. Be aware that "latest" and "staging" refer to the most recent container at the time of deployment. Over time these will be updated and newer versions pushed to the Docker Repositories (either DockerHub or Gitlab or elsewhere).
+
+```BASH
+# ==================
+# Docker Tags
+# ==================
+FILEREADER_TAG=latest
+AISIMOV_TAG=latest
+RABBIT_TAG=3.9.24-management 
+DECODER_TAG=latest
+INSERTER_TAG=latest
+DATABASE_TAG=staging
+PGFEATSERV_TAG=latest
+```
+
+In the event of you needing to use a specific version, or you want to get a newer version of "latest" or "staging" you would edit the .env file (if required) and then pull the containers using Docker Compose.
+
+In this example there is an updated version of the database while all the other containers are unchanged in the repositories:
+
+```
+$ docker compose pull
+WARN[0000] /home/VLIZ2000/rory.meyer/git/quick-start/docker-compose.yaml: `version` is obsolete 
+[+] Pulling 13/13
+ ✔ ais_decoder Pulled                                                                                                                                                                                   0.9s 
+ ✔ ais_i_mov Pulled                                                                                                                                                                                     0.9s 
+ ✔ rabbitmq Pulled                                                                                                                                                                                      1.0s 
+ ✔ database 7 layers [⣿⣿⣿⣿⣿⣿⣿]      0B/0B      Pulled                                                                                                                                                   2.3s 
+   ✔ 8f7c78a271b7 Already exists                                                                                                                                                                        0.0s 
+   ✔ 4f4fb700ef54 Already exists                                                                                                                                                                        0.0s 
+   ✔ f6e10188fbcd Pull complete                                                                                                                                                                         1.0s 
+   ✔ b9078be99a5e Pull complete                                                                                                                                                                         0.6s 
+   ✔ f191990bae73 Pull complete                                                                                                                                                                         0.5s 
+   ✔ 0aa37ab3b71f Pull complete                                                                                                                                                                         1.0s 
+   ✔ b7db278f5e8b Pull complete                                                                                                                                                                         1.1s 
+ ✔ db_inserter Pulled                                                                                                                                                                                   0.8s 
+ ✔ featserv Pulled               
+
+```
+
+**NOTE**: there are [serious issues with going between major versions](https://www.postgresql.org/docs/16/pgupgrade.html) of Postgres/PostGIS/TimescaleDB databases. You MUST trial run this on a dev machine before updating a database in production.
+
+Typical method of doing a service upgrade on a specific service would be:
+```bash
+docker compose stop <container name>
+docker compose pull
+docker compose up -d <container name>
+```
+It's always worth checking whether a service is operating as expected after upgrade as there could be changes in config files, stored volumes etc that break functionality.
