@@ -156,7 +156,7 @@ services:
     # Uncomment when requiring persistance 
       # - ${DB_VOLUME_PATH}:/home/postgres/pgdata/data
       - db_geom_store:/tmp/shapes:Z
-      # - db_data_store:/home/postgres/pgdata/data 
+      - db_data_store:/home/postgres/pgdata/data 
 
   featserv: 
     image: pramsey/pg_featureserv:${PGFEATSERV_TAG}
@@ -179,8 +179,9 @@ services:
       - PGFS_WEBSITE_BASEMAPURL=https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png
       - PGFS_PAGING_LIMITDEFAULT=1000
       - PGFS_PAGING_LIMITMAX=10000
-      - PGFS_SERVER_CORSORIGINS="*"
-      - PGFS_DATABASE_FUNCTIONINCLUDES="postgis_ftw"
+      - PGFS_SERVER_CORSORIGINS=*
+      - PGFS_DATABASE_FUNCTIONINCLUDES=postgisftw
+      - PGFS_DATABASE_TABLEINCLUDES=postgisftw
     # volumes:
       # - ./config/feat_serv_config.toml:/app/config.toml:ro
 
