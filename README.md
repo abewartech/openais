@@ -29,8 +29,11 @@ cp config/example.env .env
 nano .env
 # Edit the environment file to represent your current environment
 docker compose pull
+docker volume create <db_data_volume>
 docker compose up -d
 ```
+NOTE: "docker compose down" shutsdown and deletes volumes that are created on "docker compose up". In production this is an easy way to accidently delete the entire database data volume. Creating this volume first, outside of "docker compose up" should prevent "down" from deleting it. 
+
 This should bring up the various containers in a detached mode. The database might take a while to come up the first time as it will (if FETCH_GEOM != False) download publically available geometry files from a remote server. To check whether everything is up you can run: 
 ```BASH
 USER$ docker ps
