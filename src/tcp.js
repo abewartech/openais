@@ -1,9 +1,10 @@
 const net = require('net');
 
 const client = new net.Socket();
-client.connect(1478, '127.0.0.1', () => {
+client.connect(1478, '0.0.0.0', () => {
     console.log('Connected');
 });
+
 
 client.on('data', (data) => {
     console.log('Received: ' + data);

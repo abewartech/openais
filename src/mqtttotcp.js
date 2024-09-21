@@ -3,7 +3,7 @@ const net = require('net');
 
 
 const mqttHost = 'mqtt://82.197.69.32:1883';
-const tcpHost = '127.0.0.1';
+const tcpHost = '0.0.0.0';
 const tcpPort = 1478;
 
 const mqttClient = mqtt.connect(mqttHost);
